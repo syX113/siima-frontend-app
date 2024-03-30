@@ -1,3 +1,5 @@
 pandas
 streamlit
 pymongo
+altair
+datetime
