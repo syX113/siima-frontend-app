@@ -3,3 +3,5 @@ streamlit
 pymongo
 altair
 datetime
+streamlit_authenticator
+yaml

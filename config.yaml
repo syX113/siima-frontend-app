@@ -1,0 +1,21 @@
+cookie:
+  expiry_days: 30
+  key: siima_app_signature_key
+  name: siima_app_cookie
+credentials:
+  usernames:
+    dhanisch:
+      email: dominik.hanisch@siima.ch
+      failed_login_attempts: 0
+      logged_in: false
+      name: Tim Giger
+      password: $2b$12$Xoa.WoF0/KZLHRQmh8oe5OhHKSI9ay92uoo2NX2K77iLXoe7MjGLG
+    tgiger:
+      email: tim.giger93@gmail.com
+      failed_login_attempts: 0
+      logged_in: true
+      name: Tim Giger
+      password: $2b$12$IuRYqebImSSix5khxGunwu77IO5cXHVuvcOnwEG1foczKbQwd9tT2
+user_collection_map:
+  dhanisch: device_tasmota_gplug_001
+  tgiger: device_tasmota_gplug_001
