@@ -13,10 +13,10 @@ def authenticate():
         config = yaml.load(file, Loader=SafeLoader)
 
     authenticator = stauth.Authenticate(
-        config['credentials'],
-        config['cookie']['name'],
-        config['cookie']['key'],
-        config['cookie']['expiry_days']
+        st.secrets["credentials"].to_dict(),
+        st.secrets['cookie']['name'],
+        st.secrets['cookie']['key'],
+        st.secrets['cookie']['expiry_days']
     )
     user_collection_map = config.get('user_collection_map', {})
     return authenticator, config, user_collection_map
