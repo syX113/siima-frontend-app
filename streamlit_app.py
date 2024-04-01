@@ -43,9 +43,19 @@ def fetch_data(client, collection_name):
     df = pd.DataFrame(data)
     # Convert 'DeviceMessageTimestamp' to datetime
     df['DeviceMessageTimestamp'] = pd.to_datetime(df['DeviceMessageTimestamp'], unit='ms')
+
     # Localize timestamps to "Europe/Zurich" without converting from UTC
     df['DeviceMessageTimestamp'] = df['DeviceMessageTimestamp'].dt.tz_localize('Europe/Zurich', ambiguous='raise')
     df = df[['DeviceMessageTimestamp', 'SmartMeter_Consumption_B1_kW', 'SmartMeter_Production_E1_kW', 'Current_Total_Input_W', 'Current_Total_Output_W']]
+
+    # Convert 'Current_Total_Input_W' and 'Current_Total_Output_W' from W to kW
+    df['Current_Total_Input_W'] = df['Current_Total_Input_W'] / 1000
+    df['Current_Total_Output_W'] = df['Current_Total_Output_W'] / 1000
+
+    # Rename columns to reflect that they are now in kW
+    df.rename(columns={'Current_Total_Input_W': 'Current_Total_Input_kW', 'Current_Total_Output_W': 'Current_Total_Output_kW'}, inplace=True)
+
+    df = df[['DeviceMessageTimestamp', 'SmartMeter_Consumption_B1_kW', 'SmartMeter_Production_E1_kW', 'Current_Total_Input_kW', 'Current_Total_Output_kW']]
 
     return df
 
@@ -57,8 +67,8 @@ _, authentication_status, username = authenticator.login(fields={'Form name':'Si
 # Check if user is authenticated
 if authentication_status:
 
-    st.write(f'Welcome *{st.session_state["name"]}*')
-    st.title('Siima | Swiss Energy Account')
+    st.write(f'Logged in as: *{st.session_state["name"]}*')
+    st.title('Siima | Swiss Energy Account :zap:')
     collection_name = user_collection_map.get(username, "default_collection_name")
 
     client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
@@ -115,7 +125,7 @@ if authentication_status:
             """, unsafe_allow_html=True)
 
         # Simple horizontal devider line
-        st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 10px;"/>', unsafe_allow_html=True)
+        st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 1px;"/>', unsafe_allow_html=True)
 
         # Chart for the Energy Account Balance
         balance_chart = alt.Chart(df).mark_line(color='#42c0b1').encode(
@@ -130,30 +140,29 @@ if authentication_status:
 
         st.altair_chart(balance_chart, use_container_width=True)
 
-        # Simple horizontal devider line
-        st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 10px;"/>', unsafe_allow_html=True)
+        st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 1px;"/>', unsafe_allow_html=True)
 
         # Chart for "Feed In" and "From Grid"
         base = alt.Chart(df).properties(
             width=800,
             height=400,
-            title='Energy Movement (W)'
+            title='Energy Movement (kW)'
         )
 
         # Create the chart for 'Current_Total_Input_W' without custom Y-axis color
         input_line = base.mark_line().encode(
             x=alt.X('DeviceMessageTimestamp:T', title='Time'),
-            y=alt.Y('Current_Total_Input_W:Q', title='From Grid & Feed In (W)'),
+            y=alt.Y('Current_Total_Input_kW:Q', title='From Grid & Feed In (kW)'),
             color=alt.value('#FF9B9B'),  # Direct color value
-            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Current_Total_Input_W:Q', title='From Grid (W)', format='.2f')]
+            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Current_Total_Input_W:Q', title='From Grid (kW)', format='.2f')]
         )
 
         # Create the chart for 'Current_Total_Output_W' without custom Y-axis color
         output_line = base.mark_line().encode(
             x=alt.X('DeviceMessageTimestamp:T', title='Time'),
-            y=alt.Y('Current_Total_Output_W:Q', title='From Grid & Feed In (W)'),
+            y=alt.Y('Current_Total_Output_kW:Q', title='From Grid & Feed In (kW)'),
             color=alt.value('#8FD694'),  # Direct color value
-            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Current_Total_Output_W:Q', title='Feed In (W)', format='.2f')]
+            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Current_Total_Output_W:Q', title='Feed In (kW)', format='.2f')]
         )
 
         # Combine the charts
@@ -165,10 +174,10 @@ if authentication_status:
 
         # Display the chart
         st.altair_chart(chart, use_container_width=True)
-        legend_html = "".join([f"<span style='color:{color}; margin-right: 20px;'>● {legend}</span>" for legend, color in zip(legend_entries, colors)])
-        st.markdown(f"<div style='text-align: left;'>{legend_html}</div>", unsafe_allow_html=True)
+        legend_html = "".join([f"<span style='color:{color}; margin-right: 15px;'>● {legend}</span>" for legend, color in zip(legend_entries, colors)])
+        st.markdown(f"<div style='text-align: right;'>{legend_html}</div>", unsafe_allow_html=True)
 
-    st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 10px;"/>', unsafe_allow_html=True)
+    st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 1px;"/>', unsafe_allow_html=True)
 
     # Render logout button
     authenticator.logout()
