@@ -50,6 +50,7 @@ def fetch_data(client, collection_name):
     return df
 
 # Authenticate user
+st.set_page_config(page_title='Siima | Swiss Energy Account', page_icon=':zap:', layout="centered", initial_sidebar_state="auto", menu_items=None)
 authenticator, user_collection_map = authenticate()
 _, authentication_status, username = authenticator.login(fields={'Form name':'Siima Login', 'Username':'Username', 'Password':'Password', 'Login':'Login'})
 
