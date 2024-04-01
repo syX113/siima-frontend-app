@@ -121,7 +121,7 @@ if authentication_status:
         balance_chart = alt.Chart(df).mark_line(color='#42c0b1').encode(
             x=alt.X('DeviceMessageTimestamp:T', title='Time'),
             y=alt.Y('Energy_Account_Balance_kW:Q', title='Energy Account Balance (kW)'),
-            tooltip=['DeviceMessageTimestamp:T', 'Energy_Account_Balance_kW:Q']
+            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Energy_Account_Balance_kW:Q', title='Account Balance (kW)', format='.2f')]
         ).properties(
             width=800,
             height=400,
