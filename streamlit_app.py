@@ -8,9 +8,6 @@ import yaml
 from yaml.loader import SafeLoader
 
 def authenticate():
-    
-    with open('config.yaml') as file:
-        config = yaml.load(file, Loader=SafeLoader)
 
     authenticator = stauth.Authenticate(
         st.secrets["credentials"].to_dict(),
@@ -18,9 +15,9 @@ def authenticate():
         st.secrets['cookie']['key'],
         st.secrets['cookie']['expiry_days']
     )
-    user_collection_map = config.get('user_collection_map', {})
-    return authenticator, config, user_collection_map
-
+    
+    user_collection_map = st.secrets["user_collection_map"].to_dict()
+    return authenticator, user_collection_map
 
 def calculate_energy_balance(df):
 
@@ -71,29 +68,22 @@ def fetch_data(collection_name):
     df = df[['DeviceMessageTimestamp', 'SmartMeter_Consumption_B1_kW', 'SmartMeter_Production_E1_kW', 'Current_Total_Input_W', 'Current_Total_Output_W']]
 
     
-    
     return df
 
 ### Main Logic ###
 
 # Authenticate user
-authenticator, config, user_collection_map = authenticate()
-authenticator.login(fields={'Form name':'Login', 'Username':'Username', 'Password':'Password', 'Login':'Login'})
-
+authenticator, user_collection_map = authenticate()
+_, authentication_status, username = authenticator.login(fields={'Form name':'Login', 'Username':'Username', 'Password':'Password', 'Login':'Login'})
 
 # User is authenticated
-if st.session_state["authentication_status"]:
-
-    # Directly dump hashed password in application
-    with open('config.yaml', 'w') as file:
-        yaml.dump(config, file, default_flow_style=False)
-
-    username = st.session_state.get("username")
+if authentication_status:
 
     st.write(f'Welcome *{st.session_state["name"]}*')
     st.title('Siima | Swiss Energy Account')
 
-    collection_name = user_collection_map.get(username, "default_collection_name")
+    collection_mapping = user_collection_map.get('mapping', {})
+    collection_name = collection_mapping.get(username, "default_collection_name")
 
     df = fetch_data(collection_name)
     df = calculate_energy_balance(df)
