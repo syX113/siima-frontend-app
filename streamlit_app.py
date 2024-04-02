@@ -3,6 +3,7 @@ import streamlit_authenticator as stauth
 import pandas as pd
 import altair as alt
 import os
+from datetime import datetime, timedelta
 from pymongo import MongoClient
 
 def authenticate():
@@ -29,7 +30,6 @@ def calculate_energy_balance(df):
     
     return df
 
-
 def fetch_data(client, collection_name):
     db = client['cosmos-db-siima-telemetry']
     collection = db[collection_name]
@@ -38,82 +38,116 @@ def fetch_data(client, collection_name):
         'SmartMeter_Consumption_B1_kW': 1, 'SmartMeter_Production_E1_kW': 1,
         'Current_Total_Input_W': 1, 'Current_Total_Output_W': 1
     }
-    data = list(collection.find(projection=projection).sort('DeviceMessageTimestamp', 1))
-
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(list(collection.find(projection=projection).sort('DeviceMessageTimestamp', 1)))
+    
     # Convert 'DeviceMessageTimestamp' to datetime
     df['DeviceMessageTimestamp'] = pd.to_datetime(df['DeviceMessageTimestamp'], unit='ms')
-
+    
     # Localize timestamps to "Europe/Zurich" without converting from UTC
     df['DeviceMessageTimestamp'] = df['DeviceMessageTimestamp'].dt.tz_localize('Europe/Zurich', ambiguous='raise')
     df = df[['DeviceMessageTimestamp', 'SmartMeter_Consumption_B1_kW', 'SmartMeter_Production_E1_kW', 'Current_Total_Input_W', 'Current_Total_Output_W']]
-
+    
     # Convert 'Current_Total_Input_W' and 'Current_Total_Output_W' from W to kW
     df['Current_Total_Input_W'] = df['Current_Total_Input_W'] / 1000
     df['Current_Total_Output_W'] = df['Current_Total_Output_W'] / 1000
 
     # Rename columns to reflect that they are now in kW
     df.rename(columns={'Current_Total_Input_W': 'Current_Total_Input_kW', 'Current_Total_Output_W': 'Current_Total_Output_kW'}, inplace=True)
-
+    # Return only selected columns
     df = df[['DeviceMessageTimestamp', 'SmartMeter_Consumption_B1_kW', 'SmartMeter_Production_E1_kW', 'Current_Total_Input_kW', 'Current_Total_Output_kW']]
 
     return df
+
+def cut_df_to_timeframe(df, timeframe):
+    now = df['DeviceMessageTimestamp'].max()
+    if timeframe == '12h':
+        cutoff_time = now - timedelta(hours=12)
+    elif timeframe == '1 day':
+        cutoff_time = now - timedelta(days=1)
+    elif timeframe == '1 week':
+        cutoff_time = now - timedelta(weeks=1)
+    elif timeframe == '1 month':
+        cutoff_time = now - pd.DateOffset(months=1)
+    else:
+        return df
+    return df[df['DeviceMessageTimestamp'] > cutoff_time]
+
+# Assuming 1 data point per minute
+timeframe_to_datapoints = {
+    '12h': 720,  # 12 hours * 60 minutes/hour
+    '1 day': 1440,  # 24 hours * 60 minutes/hour
+    '1 week': 10080,  # 7 days * 24 hours/day * 60 minutes/hour
+    '1 month': 43200,  # Approx. 30 days * 24 hours/day * 60 minutes/hour
+    'total': None  # Special case for total
+}
 
 # Authenticate user
 st.set_page_config(page_title='Siima | Swiss Energy Account', page_icon=':zap:', layout="centered", initial_sidebar_state="auto", menu_items=None)
 authenticator, user_collection_map = authenticate()
 _, authentication_status, username = authenticator.login(fields={'Form name':'Siima Login', 'Username':'Username', 'Password':'Password', 'Login':'Login'})
 
-# Check if user is authenticated
+# After user is logged in
 if authentication_status:
-
+    
     st.write(f'Logged in as: *{st.session_state["name"]}*')
     st.title('Siima | Swiss Energy Account :zap:')
-    collection_name = user_collection_map.get(username, "default_collection_name")
+    collection_name = user_collection_map.get(username)
 
     client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
     df = fetch_data(client, collection_name)
-
     df = calculate_energy_balance(df)
+    
+    # Add dropdown for timeframe selection
+    timeframe_options = ['12h', '1 day', '1 week', '1 month', 'total']
+    selected_timeframe = st.selectbox("Select desired timeframe to visualize past Energy Account Balance & Movements:", options=timeframe_options, index=1)  # Defaults to '1day'
+    df_filtered = cut_df_to_timeframe(df, selected_timeframe) if not df.empty else df
 
-    if not df.empty:
+    # Get the first 'DeviceMessageTimestamp'
+    first_timestamp = df['DeviceMessageTimestamp'].iloc[0]
+    # Format the first 'DeviceMessageTimestamp' for display
+    first_timestamp_formatted = first_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+    # Assuming 'first_timestamp' is your datetime object
+    date_str = first_timestamp.strftime('%d. %B %Y')
+    # Removing leading zero from day and adding ordinal suffix
+    formatted_date = first_timestamp.strftime("%-d. %B %Y")
+    time_str = first_timestamp.strftime('%H:%M') # Round to minute
 
-        # Get the first 'DeviceMessageTimestamp'
-        first_timestamp = df['DeviceMessageTimestamp'].iloc[0]
-
-        # Format the first 'DeviceMessageTimestamp' for display
-        first_timestamp_formatted = first_timestamp.strftime('%Y-%m-%d %H:%M:%S')
-
-        # Get the last value of 'Energy_Account_Balance_kW'
-        last_balance_value = df['Energy_Account_Balance_kW'].iloc[-1]
-
-        # Optionally, show change from the previous point
-        if len(df) > 720:
-            previous_balance_value = df['Energy_Account_Balance_kW'].iloc[-720]
-            delta = last_balance_value - previous_balance_value
-        else:
-            previous_balance_value = 0.0
-            delta = last_balance_value - previous_balance_value
-
-        # Assuming 'first_timestamp' is your datetime object
-        date_str = first_timestamp.strftime('%d. %B %Y')
-
-        # Removing leading zero from day and adding ordinal suffix
-        formatted_date = first_timestamp.strftime("%-d. %B %Y")
-        time_str = first_timestamp.strftime('%H:%M') # Round to minute
-
+    if not df_filtered.empty:
+        
+        last_balance_value = df_filtered['Energy_Account_Balance_kW'].iloc[-1]
+    
         # Setup KPI row
         col1, col2, col3 = st.columns([4, 4, 4])
-
-        # Current energy balance
+        
         with col1:
-            st.metric(label="**Energy Account Balance Now:**", value=f"{last_balance_value:.2f} kW")
+            st.metric(label="**Energy Account Balance:**", value=f"{last_balance_value:.2f} kW")
 
-        # 6 hour delta and change
+        # Determine the index for the previous balance value based on the selected timeframe
+        not_enough_data = False  # Flag to indicate if there are not enough data points
+        if selected_timeframe != 'total':
+            datapoints_back = timeframe_to_datapoints[selected_timeframe]
+            # Check if the DataFrame has enough data points
+            if len(df_filtered) >= datapoints_back:
+                previous_balance_value = df_filtered['Energy_Account_Balance_kW'].iloc[-datapoints_back]
+                delta = last_balance_value - previous_balance_value
+            else:
+                # Not enough data points
+                not_enough_data = True
+        else:
+            if len(df_filtered) > 0:
+                previous_balance_value = df_filtered['Energy_Account_Balance_kW'].iloc[0]
+                delta = last_balance_value - previous_balance_value
+            else:
+                not_enough_data = True
+                
         with col2:
-            if len(df) > 360:
-                st.metric(label="**Energy Account Balance 12h Ago:**", value=f"{previous_balance_value:.2f} kW", delta=f"{delta:.2f} kW to Now")
-
+            if not not_enough_data:
+                # Display the metric with delta if there are enough data points
+                st.metric(label=f"**Energy Account Balance {selected_timeframe} Ago:**", value=f"{previous_balance_value:.2f} kW", delta=f"{delta:.2f} kW to Now")
+            else:
+                # Display a message indicating not enough data points
+                st.metric(label=f"**Energy Account Balance {selected_timeframe} Ago:**", value="N/A")
+                
         # Show timestamp if first datapoint
         with col3:
             st.markdown(f"""
@@ -128,7 +162,7 @@ if authentication_status:
         st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 1px;"/>', unsafe_allow_html=True)
 
         # Chart for the Energy Account Balance
-        balance_chart = alt.Chart(df).mark_line(color='#42c0b1').encode(
+        balance_chart = alt.Chart(df_filtered).mark_line(color='#42c0b1').encode(
             x=alt.X('DeviceMessageTimestamp:T', title='Time'),
             y=alt.Y('Energy_Account_Balance_kW:Q', title='Energy Account Balance (kW)'),
             tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Energy_Account_Balance_kW:Q', title='Account Balance (kW)', format='.2f')]
@@ -143,7 +177,7 @@ if authentication_status:
         st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 1px;"/>', unsafe_allow_html=True)
 
         # Chart for "Feed In" and "From Grid"
-        base = alt.Chart(df).properties(
+        base = alt.Chart(df_filtered).properties(
             width=800,
             height=400,
             title='Energy Movement (kW)'
