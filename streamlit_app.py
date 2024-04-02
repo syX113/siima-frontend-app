@@ -78,11 +78,12 @@ def cut_df_to_timeframe(df, timeframe):
 
 # Assuming 1 data point per minute
 timeframe_to_datapoints = {
-    '12h': 720,  # 12 hours * 60 minutes/hour
-    '1 day': 1440,  # 24 hours * 60 minutes/hour
-    '1 week': 10080,  # 7 days * 24 hours/day * 60 minutes/hour
-    '1 month': 43200,  # Approx. 30 days * 24 hours/day * 60 minutes/hour
-    '1 year': 518400  # Approx. 365 days * 24 hours/day * 60 minutes/hour   
+    # Index = 0, therefore -1 
+    '12h': 719,  # 12 hours * 60 minutes/hour
+    '1 day': 1439,  # 24 hours * 60 minutes/hour
+    '1 week': 10079,  # 7 days * 24 hours/day * 60 minutes/hour
+    '1 month': 43299,  # Approx. 30 days * 24 hours/day * 60 minutes/hour
+    '1 year': 518399  # Approx. 365 days * 24 hours/day * 60 minutes/hour   
 }
 
 # Authenticate user
@@ -136,6 +137,7 @@ if authentication_status:
         else:
             # Not enough data points
             not_enough_data = True
+            print(len(df_filtered))
                 
         with col2:
             if not not_enough_data:
