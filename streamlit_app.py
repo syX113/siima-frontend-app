@@ -60,6 +60,8 @@ def fetch_data(client, collection_name):
 
 def cut_df_to_timeframe(df, timeframe):
     now = df['DeviceMessageTimestamp'].max()
+    if timeframe == '1h':
+        cutoff_time = now - timedelta(minutes=60)
     if timeframe == '12h':
         cutoff_time = now - timedelta(hours=12)
     elif timeframe == '1 day':
@@ -68,6 +70,8 @@ def cut_df_to_timeframe(df, timeframe):
         cutoff_time = now - timedelta(weeks=1)
     elif timeframe == '1 month':
         cutoff_time = now - pd.DateOffset(months=1)
+    elif timeframe == '1 year':
+        cutoff_time = now - pd.DateOffset(years=11)
     else:
         return df
     return df[df['DeviceMessageTimestamp'] > cutoff_time]
@@ -78,7 +82,7 @@ timeframe_to_datapoints = {
     '1 day': 1440,  # 24 hours * 60 minutes/hour
     '1 week': 10080,  # 7 days * 24 hours/day * 60 minutes/hour
     '1 month': 43200,  # Approx. 30 days * 24 hours/day * 60 minutes/hour
-    'total': None  # Special case for total
+    '1 year': 518400  # Approx. 365 days * 24 hours/day * 60 minutes/hour   
 }
 
 # Authenticate user
@@ -98,8 +102,8 @@ if authentication_status:
     df = calculate_energy_balance(df)
     
     # Add dropdown for timeframe selection
-    timeframe_options = ['12h', '1 day', '1 week', '1 month', 'total']
-    selected_timeframe = st.selectbox("Select desired timeframe to visualize past Energy Account Balance & Movements:", options=timeframe_options, index=1)  # Defaults to '1day'
+    timeframe_options = ['12h', '1 day', '1 week', '1 month', '1 year']
+    selected_timeframe = st.selectbox("Select desired timeframe to visualize past Energy Account Balance & Movements:", options=timeframe_options, index=2)  # Defaults to '1day'
     df_filtered = cut_df_to_timeframe(df, selected_timeframe) if not df.empty else df
 
     # Get the first 'DeviceMessageTimestamp'
@@ -124,21 +128,14 @@ if authentication_status:
 
         # Determine the index for the previous balance value based on the selected timeframe
         not_enough_data = False  # Flag to indicate if there are not enough data points
-        if selected_timeframe != 'total':
-            datapoints_back = timeframe_to_datapoints[selected_timeframe]
-            # Check if the DataFrame has enough data points
-            if len(df_filtered) >= datapoints_back:
-                previous_balance_value = df_filtered['Energy_Account_Balance_kW'].iloc[-datapoints_back]
-                delta = last_balance_value - previous_balance_value
-            else:
-                # Not enough data points
-                not_enough_data = True
+        datapoints_back = timeframe_to_datapoints[selected_timeframe]
+        # Check if the DataFrame has enough data points
+        if len(df_filtered) >= datapoints_back:
+            previous_balance_value = df_filtered['Energy_Account_Balance_kW'].iloc[-datapoints_back]
+            delta = last_balance_value - previous_balance_value
         else:
-            if len(df_filtered) > 0:
-                previous_balance_value = df_filtered['Energy_Account_Balance_kW'].iloc[0]
-                delta = last_balance_value - previous_balance_value
-            else:
-                not_enough_data = True
+            # Not enough data points
+            not_enough_data = True
                 
         with col2:
             if not not_enough_data:
@@ -161,9 +158,18 @@ if authentication_status:
         # Simple horizontal devider line
         st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 1px;"/>', unsafe_allow_html=True)
 
+        # Not needed!
+        # Determine the appropriate timeUnit for the selected timeframe
+        if selected_timeframe in ['12h', '1 day']:
+            time_unit = 'hours'
+        elif selected_timeframe in ['1 week', '1 month']:
+            time_unit = 'date'
+        elif selected_timeframe in ['1 year', 'total']:
+            time_unit = 'month'
+    
         # Chart for the Energy Account Balance
         balance_chart = alt.Chart(df_filtered).mark_line(color='#42c0b1').encode(
-            x=alt.X('DeviceMessageTimestamp:T', title='Time'),
+            x=alt.X('DeviceMessageTimestamp:T', title='Time'    ),
             y=alt.Y('Energy_Account_Balance_kW:Q', title='Energy Account Balance (kW)'),
             tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Energy_Account_Balance_kW:Q', title='Account Balance (kW)', format='.2f')]
         ).properties(
