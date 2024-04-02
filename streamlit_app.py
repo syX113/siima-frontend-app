@@ -103,7 +103,7 @@ if authentication_status:
     
     # Add dropdown for timeframe selection
     timeframe_options = ['12h', '1 day', '1 week', '1 month', '1 year']
-    selected_timeframe = st.selectbox("Select desired timeframe to visualize past Energy Account Balance & Movements:", options=timeframe_options, index=2)  # Defaults to '1day'
+    selected_timeframe = st.selectbox("Select desired timeframe to visualize past Energy Account Balance & Movements:", options=timeframe_options, index=1)  # Defaults to '1day'
     df_filtered = cut_df_to_timeframe(df, selected_timeframe) if not df.empty else df
 
     # Get the first 'DeviceMessageTimestamp'
