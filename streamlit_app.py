@@ -100,6 +100,8 @@ if authentication_status:
 
     client = MongoClient(os.getenv("MONGO_CONNECTION_STRING"))
     df = fetch_data(client, collection_name)
+
+    # TODO: Move energy balance calculation to backend
     df = calculate_energy_balance(df)
     
     # Add dropdown for timeframe selection
@@ -137,7 +139,6 @@ if authentication_status:
         else:
             # Not enough data points
             not_enough_data = True
-            print(len(df_filtered))
                 
         with col2:
             if not not_enough_data:
@@ -151,7 +152,7 @@ if authentication_status:
         with col3:
             st.markdown(f"""
             <div style="margin-top: -0px;">
-                <span style="font-size: 0.85em; font-weight: bold;">Smart Meter Data Received from:</span><br>
+                <span style="font-size: 0.85em; font-weight: bold;">Smart Meter Data available since:</span><br>
             </div>
             {formatted_date}<br>
             {time_str}
@@ -160,7 +161,7 @@ if authentication_status:
         # Simple horizontal devider line
         st.markdown('<hr style="border-top-color: #ffffff; border-top-width: 1px;"/>', unsafe_allow_html=True)
 
-        # Not needed!
+        # TODO: Change granularity of x-axis granularity, maybe the following can be refactored
         # Determine the appropriate timeUnit for the selected timeframe
         if selected_timeframe in ['12h', '1 day']:
             time_unit = 'hours'
@@ -170,10 +171,10 @@ if authentication_status:
             time_unit = 'month'
     
         # Chart for the Energy Account Balance
-        balance_chart = alt.Chart(df_filtered).mark_line(color='#42c0b1').encode(
-            x=alt.X('DeviceMessageTimestamp:T', title='Time'    ),
+        balance_chart = alt.Chart(df_filtered).mark_line(color='#42c0b1', size=3).encode(
+            x=alt.X('DeviceMessageTimestamp:T', title='Time'),
             y=alt.Y('Energy_Account_Balance_kW:Q', title='Energy Account Balance (kW)'),
-            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Energy_Account_Balance_kW:Q', title='Account Balance (kW)', format='.2f')]
+            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Timestamp', format='%H:%M %d.%m.%Y'), alt.Tooltip('Energy_Account_Balance_kW:Q', title='Account Balance (kW)', format='.2f')]
         ).properties(
             width=800,
             height=400,
@@ -196,7 +197,7 @@ if authentication_status:
             x=alt.X('DeviceMessageTimestamp:T', title='Time'),
             y=alt.Y('Current_Total_Input_kW:Q', title='From Grid & Feed In (kW)'),
             color=alt.value('#FF9B9B'),  # Direct color value
-            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Current_Total_Input_W:Q', title='From Grid (kW)', format='.2f')]
+            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Timestamp', format='%H:%M %d.%m.%Y'), alt.Tooltip('Current_Total_Input_kW:Q', title='From Grid (kW)', format='.2f')]
         )
 
         # Create the chart for 'Current_Total_Output_W' without custom Y-axis color
@@ -204,7 +205,7 @@ if authentication_status:
             x=alt.X('DeviceMessageTimestamp:T', title='Time'),
             y=alt.Y('Current_Total_Output_kW:Q', title='From Grid & Feed In (kW)'),
             color=alt.value('#8FD694'),  # Direct color value
-            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Time'), alt.Tooltip('Current_Total_Output_W:Q', title='Feed In (kW)', format='.2f')]
+            tooltip=[alt.Tooltip('DeviceMessageTimestamp:T', title='Timestamp', format='%H:%M %d.%m.%Y'), alt.Tooltip('Current_Total_Output_kW:Q', title='Feed In (kW)', format='.2f')]
         )
 
         # Combine the charts
